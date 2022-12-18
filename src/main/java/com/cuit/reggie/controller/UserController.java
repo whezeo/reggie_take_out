@@ -6,10 +6,11 @@ import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.cuit.reggie.pojo.User;
 import com.cuit.reggie.service.UserService;
 import com.cuit.reggie.vo.R;
-import com.cuit.reggie.vo.utils.SMSUtils;
 import com.cuit.reggie.vo.utils.ValidateCodeUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpSession;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user")
@@ -24,10 +26,12 @@ import java.util.Map;
 public class UserController {
     @Autowired
     UserService userService;
+    @Autowired
+    StringRedisTemplate redisTemplate;
 
     @PostMapping("/sendMsg")
     public R<String> sendMsg(HttpSession session, @RequestBody User user){
-        /**
+        /*
          * 获取手机号
          * 生成验证码
          * 验证码保存session
@@ -38,10 +42,11 @@ public class UserController {
 
             log.info("code={}",code);
             //SMSUtils.sendMessage("瑞吉外卖","",phone,code);
-            session.setAttribute(phone,code);
-            return R.success("验证码发送成功");
+            //session.setAttribute(phone,code);
+            redisTemplate.opsForValue().set(phone,code,5, TimeUnit.MINUTES);
+            return R.success("验证码发送成功,有效时间五分钟。");
         }
-        return null;
+        return R.error("发送失败！");
 
     }
 
@@ -57,7 +62,9 @@ public class UserController {
         String phone = (String) user.get("phone");
         String code = (String) user.get("code");
 
-        String readCode = (String) session.getAttribute(phone);
+        //String readCode = (String) session.getAttribute(phone);
+        String readCode = redisTemplate.opsForValue().get(phone);
+        log.info(readCode);
         if(!readCode.equals(code)){
             return R.error("验证码不正确");
         }
@@ -71,6 +78,7 @@ public class UserController {
             user1.setStatus(1);
             userService.save(user1);
         }
+        redisTemplate.delete(phone);
         session.setAttribute("user",user1.getId());
         return R.success("登录成功");
     }
