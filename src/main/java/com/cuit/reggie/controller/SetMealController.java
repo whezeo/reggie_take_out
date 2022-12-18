@@ -13,6 +13,8 @@ import com.cuit.reggie.vo.dto.SetmealDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -31,6 +33,7 @@ public class SetMealController {
     CategoryService categoryService;
 
     @PostMapping
+    @CacheEvict(value = "setmealList",allEntries = true)
     public R<String> save(@RequestBody SetmealDto setmealDto){
         log.info("新增套餐!");
         setmealService.saveWithDish(setmealDto);
@@ -63,12 +66,14 @@ public class SetMealController {
     }
 
     @DeleteMapping
+    @CacheEvict(value = "setmealList",allEntries = true)
     public R<String> remove(@RequestParam List<Long> ids){
         log.info("删除套餐操作");
         setmealService.removeWithDishs(ids);
         return R.success("删除成功");
     }
     @GetMapping("/list")
+    @Cacheable(value = "setmealList",key = "#setmeal.categoryId + '_'  + #setmeal.status")
     public R<List<Setmeal>> list(Setmeal setmeal){
         LambdaQueryWrapper<Setmeal> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(setmeal.getCategoryId()!=null,Setmeal::getCategoryId,setmeal.getCategoryId());
